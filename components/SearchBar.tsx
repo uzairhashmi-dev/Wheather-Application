@@ -78,6 +78,7 @@ export default function SearchBar() {
       <div
         role="combobox"
         aria-expanded={shouldShowDropdown}
+        aria-controls="city-suggestions"
         aria-haspopup="listbox"
         aria-owns="city-suggestions"
         className={`

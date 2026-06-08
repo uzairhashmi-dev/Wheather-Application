@@ -9,7 +9,7 @@ import { CloudSun, Sun, Moon, Wind } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
 export default function Navbar() {
-  const { theme, toggleTheme, isDark } = useTheme();
+  const {  toggleTheme, isDark } = useTheme();
 
   return (
     <header className="sticky top-0 z-50 glass border-b border-white/10 dark:border-white/5">
