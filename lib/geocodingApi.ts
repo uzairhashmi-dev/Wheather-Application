@@ -1,37 +1,102 @@
-// lib/geocodingApi.ts
-// WHY: Isolates all geocoding (city name → coordinates) API logic in one place.
-// Keeps components clean — they just call a function, not raw fetch calls.
+// Handles all communication with the Open-Meteo Geocoding API.
+// Converts a city name string into a list of matching GeocodingResult objects.
+// Components call fetchCitySuggestions() — no raw fetch() anywhere else.
 
-import { GeocodingResponse, GeocodingResult } from "@/types/weather";
+import type { GeocodingApiResponse, GeocodingResult } from '@/types/weather';
 
-const GEOCODING_BASE_URL = "https://geocoding-api.open-meteo.com/v1/search";
+const BASE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
-export async function searchCities(
-  cityName: string,
-  count: number = 6
+/** How many city suggestions to request from the API */
+const SUGGESTION_COUNT = 6;
+
+// Core fetcher
+
+/**
+ * Searches for cities matching the given query string.
+ *
+ * @param query   The city name typed by the user (e.g. "Berlin")
+ * @returns       An array of GeocodingResult objects, or [] on empty / error
+ * @throws        Re-throws on network failure so the store can handle it
+ */
+export async function fetchCitySuggestions(
+  query: string
 ): Promise<GeocodingResult[]> {
-  if (!cityName.trim()) return [];
+  const trimmed = query.trim();
 
-  const params = new URLSearchParams({
-    name: cityName.trim(),
-    count: count.toString(),
-    language: "en",
-    format: "json",
-  });
+  // Guard: don't bother hitting the network for very short strings
+  if (trimmed.length < 2) return [];
 
-  const url = `${GEOCODING_BASE_URL}?${params.toString()}`;
+  const url = buildGeocodingUrl(trimmed);
 
   const response = await fetch(url, {
-    next: { revalidate: 3600 }, // Cache for 1 hour (Next.js App Router)
+    // next.js fetch extension — don't cache search results
+    cache: 'no-store',
   });
 
   if (!response.ok) {
-    throw new Error(
-      `Geocoding API failed: ${response.status} ${response.statusText}`
+    throw new GeocodingApiError(
+      `Geocoding API responded with status ${response.status}`,
+      response.status
     );
   }
 
-  const data: GeocodingResponse = await response.json();
+  const data: GeocodingApiResponse = await response.json();
 
+  // API returns `results` only when matches exist; otherwise the key is absent
   return data.results ?? [];
+}
+
+// Helpers
+
+/** Builds the full geocoding request URL with query params */
+function buildGeocodingUrl(cityName: string): string {
+  const params = new URLSearchParams({
+    name: cityName,
+    count: String(SUGGESTION_COUNT),
+    language: 'en',
+    format: 'json',
+  });
+
+  return `${BASE_URL}?${params.toString()}`;
+}
+
+/**
+ * Returns a human-readable label for a GeocodingResult,
+ * e.g. "Berlin, Berlin, Germany"
+ */
+export function formatCityLabel(result: GeocodingResult): string {
+  const parts: string[] = [result.name];
+
+  if (result.admin1 && result.admin1 !== result.name) {
+    parts.push(result.admin1);
+  }
+
+  parts.push(result.country);
+
+  return parts.join(', ');
+}
+
+/**
+ * Works in all modern browsers / Node 18+.
+ *
+ * @example flagEmoji("DE") // "🇩🇪"
+ */
+export function flagEmoji(countryCode: string): string {
+  const code = countryCode.toUpperCase();
+  // Each letter is shifted to the Regional Indicator Symbol block (U+1F1E6+)
+  return [...code]
+    .map((char) => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65))
+    .join('');
+}
+
+// Custom error class
+
+export class GeocodingApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode?: number
+  ) {
+    super(message);
+    this.name = 'GeocodingApiError';
+  }
 }

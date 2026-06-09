@@ -1,222 +1,274 @@
+// ─────────────────────────────────────────────────────────────────────────────
 // components/SearchBar.tsx
-"use client";
+// The main search experience. Handles:
+//   • Controlled input with debounced API calls (300 ms)
+//   • Dropdown suggestion list with flag + region info
+//   • Keyboard navigation (↑ ↓ Enter Escape)
+//   • Click-outside to close dropdown
+//   • Loading spinner inside input
+//   • Empty state + error state in dropdown
+// ─────────────────────────────────────────────────────────────────────────────
 
-import { useRef, useState, useCallback } from "react";
-import { Search, X, Loader2, MapPin, Globe } from "lucide-react";
-import { useWeatherStore } from "@/store/weatherStore";
-import { GeocodingResult } from "@/types/weather";
+'use client';
+
+import {
+  useRef,
+  useEffect,
+  useCallback,
+  useState,
+  KeyboardEvent,
+} from 'react';
+import { useRouter } from 'next/navigation';
+import { Search, X, Loader2, MapPin } from 'lucide-react';
+
+import { useSearch } from '@/store/weatherStore';
+import { formatCityLabel, flagEmoji } from '@/lib/geocodingApi';
+import type { GeocodingResult } from '@/types/weather';
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEBOUNCE_MS = 300;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function SearchBar() {
+  const router = useRouter();
+
   const {
     searchQuery,
-    searchResults,
-    isSearching,
-    searchError,
+    suggestions,
+    suggestionsStatus,
     setSearchQuery,
-    searchCity,
+    fetchSuggestions,
     fetchWeather,
-    clearSearchResults,
-  } = useWeatherStore();
+    clearSuggestions,
+  } = useSearch();
 
-  const [isOpen, setIsOpen] = useState(false);
+  // Which suggestion is highlighted via keyboard
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  // Derived — no useState needed, avoids the useEffect setState ESLint error
+  const isOpen = suggestions.length > 0;
+
   const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Derived — dropdown sirf tab show ho jab isOpen true ho AUR results/error ho
-  const shouldShowDropdown =
-    isOpen && (searchResults.length > 0 || !!searchError);
+  // ── Click outside closes dropdown
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        clearSuggestions();
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [clearSuggestions]);
 
+  // ── Debounced fetch ───────────────────────────────────────────────────────
   const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
+    (value: string) => {
       setSearchQuery(value);
 
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
-      if (!value.trim()) {
-        clearSearchResults();
-        setIsOpen(false);
+      if (value.trim().length < 2) {
+        clearSuggestions();
         return;
       }
 
-      debounceRef.current = setTimeout(() => {
-        searchCity(value);
-        setIsOpen(true);
-      }, 400);
+      debounceTimer.current = setTimeout(() => {
+        fetchSuggestions(value);
+        setActiveIndex(-1);
+      }, DEBOUNCE_MS);
     },
-    [setSearchQuery, searchCity, clearSearchResults]
+    [setSearchQuery, fetchSuggestions, clearSuggestions]
   );
 
-  const handleCitySelect = (city: GeocodingResult) => {
-    setIsOpen(false);
-    fetchWeather(city);
-    inputRef.current?.blur();
-  };
-
-  const handleClear = () => {
-    setSearchQuery("");
-    clearSearchResults();
-    setIsOpen(false);
-    inputRef.current?.focus();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      setIsOpen(false);
+  // ── Select a suggestion ───────────────────────────────────────────────────
+  const handleSelect = useCallback(
+    async (location: GeocodingResult) => {
+      clearSuggestions();
       inputRef.current?.blur();
+
+      await fetchWeather(location);
+      router.push('/weather');
+    },
+    [fetchWeather, clearSuggestions, router]
+  );
+
+  // ── Clear input ───────────────────────────────────────────────────────────
+  function handleClear() {
+    setSearchQuery('');
+    clearSuggestions();
+    inputRef.current?.focus();
+  }
+
+  // ── Keyboard navigation ───────────────────────────────────────────────────
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (!isOpen || suggestions.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveIndex((prev) =>
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        );
+        break;
+
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveIndex((prev) =>
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        );
+        break;
+
+      case 'Enter':
+        e.preventDefault();
+        if (activeIndex >= 0 && suggestions[activeIndex]) {
+          handleSelect(suggestions[activeIndex]);
+        }
+        break;
+
+      case 'Escape':
+        clearSuggestions();
+        inputRef.current?.blur();
+        break;
     }
-    if (e.key === "Enter" && searchQuery.trim()) {
-      searchCity(searchQuery);
-      setIsOpen(true);
-    }
-  };
+  }
+
+  const isLoading = suggestionsStatus === 'loading';
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto">
-      {/* Input container */}
-      <div
-        role="combobox"
-        aria-expanded={shouldShowDropdown}
-        aria-controls="city-suggestions"
-        aria-haspopup="listbox"
-        aria-owns="city-suggestions"
-        className={`
-          flex items-center gap-3 px-4 py-3.5 rounded-2xl
-          bg-white dark:bg-slate-800/80
-          border-2 transition-all duration-200
-          shadow-lg dark:shadow-slate-900/50
-          ${
-            shouldShowDropdown
-              ? "border-blue-400 dark:border-blue-500 shadow-blue-100 dark:shadow-blue-900/20"
-              : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-          }
-        `}
-      >
-        {/* Search icon / loader */}
-        <div className="shrink-0 text-slate-400 dark:text-slate-500">
-          {isSearching ? (
-            <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+    <div ref={containerRef} className="relative z-50 w-full max-w-2xl">
+
+      {/* ── Input wrapper ─────────────────────────────────────────────────── */}
+      <div className="relative flex items-center">
+        {/* Left icon */}
+        <div className="pointer-events-none absolute left-4 flex items-center">
+          {isLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
           ) : (
-            <Search className="w-5 h-5" />
+            <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
           )}
         </div>
 
-        {/* Input */}
         <input
           ref={inputRef}
           type="text"
-          value={searchQuery}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={() => {
-            if (searchResults.length > 0 || searchError) setIsOpen(true);
-          }}
-          placeholder="Search any city worldwide..."
-          className="
-            flex-1 bg-transparent outline-none
-            text-slate-800 dark:text-slate-100
-            placeholder:text-slate-400 dark:placeholder:text-slate-500
-            text-base font-medium
-          "
-          autoComplete="off"
-          aria-label="City search"
+          role="combobox"
+          aria-expanded={isOpen}
           aria-autocomplete="list"
-          aria-controls="city-suggestions"
+          aria-controls="search-suggestions"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="Search any city worldwide…"
+          value={searchQuery}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-12 text-base text-slate-800 placeholder-slate-400 shadow-lg shadow-slate-200/60 outline-none ring-0 transition-all duration-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 dark:shadow-slate-900/50 dark:focus:border-blue-500 dark:focus:ring-blue-500/20"
         />
 
         {/* Clear button */}
-        {searchQuery && (
+        {searchQuery.length > 0 && (
           <button
             onClick={handleClear}
-            className="shrink-0 p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             aria-label="Clear search"
+            className="absolute right-4 flex items-center justify-center rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      {/* Dropdown */}
-      {shouldShowDropdown && (
-        <div
-          ref={dropdownRef}
-          id="city-suggestions"
-          className="
-            absolute top-full left-0 right-0 mt-2 z-50
-            bg-white dark:bg-slate-800
-            border border-slate-200 dark:border-slate-700
-            rounded-2xl shadow-2xl dark:shadow-slate-900/60
-            overflow-hidden animate-slide-down
-          "
+      {/* ── Dropdown ──────────────────────────────────────────────────────── */}
+      {isOpen && (
+        <ul
+          id="search-suggestions"
           role="listbox"
-          aria-label="City suggestions"
-        >
-          {/* Error state */}
-          {searchError && !isSearching && (
-            <div className="flex items-center gap-3 px-4 py-4 text-slate-500 dark:text-slate-400">
-              <Globe className="w-5 h-5 text-amber-400 shrink-0" />
-              <p className="text-sm">{searchError}</p>
-            </div>
+        className="absolute left-0 right-0 top-[calc(100%+8px)] z-[9999] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40 dark:border-slate-700 dark:bg-slate-800 dark:shadow-slate-900/60"        >
+          {suggestions.length > 0 ? (
+            suggestions.map((result, index) => (
+              <SuggestionItem
+                key={result.id}
+                result={result}
+                isActive={index === activeIndex}
+                onClick={() => handleSelect(result)}
+                onMouseEnter={() => setActiveIndex(index)}
+              />
+            ))
+          ) : (
+            <li className="flex items-center gap-3 px-4 py-4 text-sm text-slate-500 dark:text-slate-400">
+              <MapPin className="h-4 w-4 shrink-0" />
+              No cities found. Try a different spelling.
+            </li>
           )}
-
-          {/* Results */}
-          {searchResults.length > 0 && (
-            <ul>
-              {searchResults.map((city: GeocodingResult, index: number) => (
-                <li key={city.id}>
-                  <button
-                    onClick={() => handleCitySelect(city)}
-                    className="
-                      w-full flex items-center gap-3 px-4 py-3
-                      text-left transition-colors duration-150
-                      hover:bg-blue-50 dark:hover:bg-slate-700
-                      focus-visible:bg-blue-50 dark:focus-visible:bg-slate-700
-                      group
-                    "
-                    role="option"
-                    aria-selected={false}
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
-                      <MapPin className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
-                        {city.name}
-                        {city.admin1 && (
-                          <span className="font-normal text-slate-500 dark:text-slate-400">
-                            {" "}
-                            · {city.admin1}
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                        {city.country} · {city.latitude.toFixed(2)}°N{" "}
-                        {city.longitude.toFixed(2)}°E
-                      </p>
-                    </div>
-                    {city.population && (
-                      <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 hidden sm:block">
-                        Pop. {(city.population / 1000).toFixed(0)}k
-                      </span>
-                    )}
-                  </button>
-                  {index < searchResults.length - 1 && (
-                    <div className="mx-4 border-b border-slate-100 dark:border-slate-700/50" />
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/* Powered by */}
-          <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700/50">
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center">
-              Powered by Open-Meteo Geocoding API · Free & No Key Required
-            </p>
-          </div>
-        </div>
+        </ul>
       )}
     </div>
   );
+}
+
+// Sub-component: one suggestion row
+// 
+
+interface SuggestionItemProps {
+  result: GeocodingResult;
+  isActive: boolean;
+  onClick: () => void;
+  onMouseEnter: () => void;
+}
+
+function SuggestionItem({
+  result,
+  isActive,
+  onClick,
+  onMouseEnter,
+}: SuggestionItemProps) {
+  return (
+    <li
+      role="option"
+      aria-selected={isActive}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors duration-100 ${
+        isActive
+          ? 'bg-blue-50 dark:bg-blue-950/60'
+          : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+      } border-b border-slate-100 last:border-0 dark:border-slate-700/50`}
+    >
+      {/* Country flag */}
+      <span className="text-xl leading-none" aria-hidden="true">
+        {flagEmoji(result.country_code)}
+      </span>
+
+      {/* City info */}
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {result.name}
+        </span>
+        <span className="truncate text-xs text-slate-400 dark:text-slate-500">
+          {formatCityLabel(result)}
+        </span>
+      </div>
+
+      {/* Population badge (if available) */}
+      {result.population && result.population > 0 && (
+        <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400 dark:bg-slate-700 dark:text-slate-500">
+          {formatPopulation(result.population)}
+        </span>
+      )}
+    </li>
+  );
+}
+
+// Helper
+
+function formatPopulation(pop: number): string {
+  if (pop >= 1_000_000) return `${(pop / 1_000_000).toFixed(1)}M`;
+  if (pop >= 1_000) return `${Math.round(pop / 1_000)}K`;
+  return String(pop);
 }

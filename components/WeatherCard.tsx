@@ -1,279 +1,223 @@
-// components/WeatherCard.tsx
-// WHY: Displays the current weather conditions for the selected city.
-// Shows temperature, condition, wind, humidity, feels-like, and sunrise/sunset.
-// This is the "hero" card — the most prominent part of the UI.
+// Displays: city, country flag, temperature, weather condition, feels like,
+// humidity, wind speed, sunrise/sunset, elevation, and coordinates.
+// Reads unit (°C/°F) from Zustand — no props needed for that.
 
-"use client";
+'use client';
 
 import {
   Wind,
   Droplets,
   Thermometer,
-  Eye,
   Sunrise,
   Sunset,
   MapPin,
-  CloudRain,
-  Sun,
-  Moon,
-  Cloud,
-  CloudFog,
-  CloudDrizzle,
-  CloudRain as CloudRainIcon,
-  Snowflake,
-  CloudSnow,
-  CloudLightning,
-  CloudSun,
-  CloudMoon,
-  RefreshCw,
-} from "lucide-react";
-import {
-  getWeatherDescription,
-  getWeatherIcon,
-  getWeatherGradient,
-  formatTemperature,
-  formatTime,
-} from "@/lib/weatherApi";
-import { useWeatherStore } from "@/store/weatherStore";
+  Navigation,
+  Mountain,
+} from 'lucide-react';
 
-// Icon map — maps lucide icon name string → actual component
-const IconMap: Record<string, React.FC<{ className?: string }>> = {
-  Sun,
-  Moon,
-  Cloud,
-  CloudSun,
-  CloudMoon,
-  CloudFog,
-  CloudDrizzle,
-  CloudRain: CloudRainIcon,
-  Snowflake,
-  CloudSnow,
-  CloudLightning,
-};
+import { formatTemperature } from '@/lib/weatherApi';
+import { flagEmoji } from '@/lib/geocodingApi';
+import { useTemperatureUnit } from '@/store/weatherStore';
+import type { ProcessedWeatherData } from '@/types/weather';
 
-function WeatherIcon({ code, isDay, className = "" }: { code: number; isDay: number; className?: string }) {
-  const iconName = getWeatherIcon(code, isDay);
-  const IconComponent = IconMap[iconName] ?? Cloud;
-  return <IconComponent className={className} />;
+
+interface WeatherCardProps {
+  data: ProcessedWeatherData;
 }
 
-export default function WeatherCard() {
-  const { weatherData, selectedCity, fetchWeather, isLoadingWeather } = useWeatherStore();
 
-  if (!weatherData || !selectedCity) return null;
+export default function WeatherCard({ data }: WeatherCardProps) {
+  const { unit } = useTemperatureUnit();
 
-  const { current, daily } = weatherData;
-  const gradient = getWeatherGradient(current.weather_code, current.is_day);
-  const isDay = current.is_day === 1;
-
-  const handleRefresh = () => {
-    if (selectedCity) fetchWeather(selectedCity);
-  };
-
-  const sunrise = daily.sunrise?.[0];
-  const sunset = daily.sunset?.[0];
+  const todayForecast = data.daily[0];
 
   return (
-    <div
-      className={`
-        w-full rounded-3xl overflow-hidden
-        bg-linear-to-br ${gradient}
-        shadow-2xl animate-scale-in
-        relative
-      `}
-    >
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute -bottom-8 -left-8 w-40 h-40 rounded-full bg-white/10 blur-xl" />
-      </div>
+    <article className="w-full overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-200/60 transition-colors dark:border-slate-700/60 dark:bg-slate-800 dark:shadow-slate-900/50">
 
-      <div className="relative p-6 sm:p-8 text-white">
-        {/* Header: City + Refresh */}
-        <div className="flex items-start justify-between mb-6">
+      <div
+        className={`relative px-6 py-6 sm:px-8 sm:py-8 ${
+          data.isDay
+            ? 'bg-linear-to-br from-sky-400 via-blue-500 to-indigo-600'
+            : 'bg-linear-to-br from-indigo-800 via-slate-800 to-slate-900'
+        }`}
+      >
+        {/* Decorative blurred circle */}
+        <div
+          className={`absolute right-0 top-0 h-40 w-40 -translate-y-8 translate-x-8 rounded-full blur-3xl ${
+            data.isDay ? 'bg-white/10' : 'bg-indigo-500/10'
+          }`}
+        />
+
+        {/* ── City row ────────────────────────────────────────────────────── */}
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 shrink-0 text-white/70" />
+              <h1 className="truncate text-2xl font-bold text-white sm:text-3xl">
+                {data.city}
+              </h1>
+            </div>
+            <p className="mt-0.5 text-sm font-medium text-white/70">
+              {data.country} • {data.timezone}
+            </p>
+          </div>
+
+          {/* Country flag */}
+          <span
+            className="shrink-0 text-5xl leading-none"
+            role="img"
+            aria-label={`Flag of ${data.country}`}
+          >
+            {flagEmoji(data.countryCode)}
+          </span>
+        </div>
+
+        {/* ── Temperature + condition ──────────────────────────────────────── */}
+        <div className="flex items-end justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <MapPin className="w-4 h-4 text-white/70" />
-              <span className="text-sm text-white/70 font-medium">
-                {selectedCity.country}
-                {selectedCity.admin1 ? ` · ${selectedCity.admin1}` : ""}
+            <div className="flex items-start gap-2">
+              <span className="text-7xl font-black leading-none tracking-tighter text-white sm:text-8xl">
+                {unit === 'celsius'
+                  ? data.currentTemp
+                  : Math.round((data.currentTemp * 9) / 5 + 32)}
+              </span>
+              <span className="mt-3 text-3xl font-light text-white/80">
+                {unit === 'celsius' ? '°C' : '°F'}
               </span>
             </div>
-            <h1 className="font-display text-3xl sm:text-4xl font-700 leading-tight">
-              {selectedCity.name}
-            </h1>
-          </div>
 
-          <div className="flex flex-col items-end gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={isLoadingWeather}
-              className="p-2 rounded-xl bg-white/20 hover:bg-white/30 transition-colors disabled:opacity-50"
-              aria-label="Refresh weather"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isLoadingWeather ? "animate-spin" : ""}`}
-              />
-            </button>
-            <span
-              className={`
-                text-xs px-2.5 py-1 rounded-full font-semibold
-                ${isDay ? "bg-amber-400/30 text-amber-100" : "bg-indigo-400/30 text-indigo-100"}
-              `}
-            >
-              {isDay ? "☀️ Daytime" : "🌙 Night"}
-            </span>
-          </div>
-        </div>
-
-        {/* Temperature + Weather Icon */}
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <div className="font-display text-7xl sm:text-8xl font-700 leading-none tracking-tighter mb-2">
-              {Math.round(current.temperature_2m)}°
-              <span className="text-3xl text-white/70">C</span>
-            </div>
-            <p className="text-lg text-white/90 font-medium mb-1">
-              {getWeatherDescription(current.weather_code)}
+            <p className="mt-2 text-lg font-semibold text-white/90">
+              {data.weatherIcon} {data.weatherLabel}
             </p>
-            <p className="text-sm text-white/70">
-              Feels like {formatTemperature(current.apparent_temperature)}
+
+            <p className="text-sm text-white/60">
+              Feels like{' '}
+              {formatTemperature(data.feelsLike, unit)}
             </p>
           </div>
 
-          {/* Big weather icon */}
-          <div className="shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center animate-float">
-            <WeatherIcon
-              code={current.weather_code}
-              isDay={current.is_day}
-              className="w-14 h-14 sm:w-16 sm:h-16 text-white"
-            />
-          </div>
+          {/* High / low */}
+          {todayForecast && (
+            <div className="flex shrink-0 flex-col items-end gap-1 rounded-2xl bg-white/10 px-4 py-3 backdrop-blur-sm">
+              <span className="text-xs font-medium uppercase tracking-wider text-white/60">
+                Today
+              </span>
+              <span className="text-base font-bold text-white">
+                ↑ {formatTemperature(todayForecast.tempMax, unit)}
+              </span>
+              <span className="text-base font-semibold text-white/70">
+                ↓ {formatTemperature(todayForecast.tempMin, unit)}
+              </span>
+            </div>
+          )}
         </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Humidity */}
-          <StatCard
-            icon={<Droplets className="w-4 h-4" />}
-            label="Humidity"
-            value={`${current.relative_humidity_2m}%`}
-            sub={
-              current.relative_humidity_2m > 70
-                ? "High"
-                : current.relative_humidity_2m > 40
-                ? "Normal"
-                : "Low"
-            }
-          />
-
-          {/* Wind Speed */}
-          <StatCard
-            icon={<Wind className="w-4 h-4" />}
-            label="Wind"
-            value={`${Math.round(current.wind_speed_10m)} km/h`}
-            sub={
-              current.wind_speed_10m > 50
-                ? "Strong"
-                : current.wind_speed_10m > 20
-                ? "Moderate"
-                : "Light"
-            }
-          />
-
-          {/* Precipitation */}
-          <StatCard
-            icon={<CloudRain className="w-4 h-4" />}
-            label="Precipitation"
-            value={`${current.precipitation} mm`}
-            sub="Today"
-          />
-
-          {/* Feels Like */}
-          <StatCard
-            icon={<Thermometer className="w-4 h-4" />}
-            label="Feels Like"
-            value={formatTemperature(current.apparent_temperature)}
-            sub={
-              current.apparent_temperature < current.temperature_2m
-                ? "↓ Cooler"
-                : current.apparent_temperature > current.temperature_2m
-                ? "↑ Warmer"
-                : "Same"
-            }
-          />
-        </div>
-
-        {/* Sunrise / Sunset */}
-        {sunrise && sunset && (
-          <div className="mt-3 flex items-center justify-between rounded-2xl bg-white/15 backdrop-blur-sm px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Sunrise className="w-4 h-4 text-amber-300" />
-              <div>
-                <p className="text-[10px] text-white/60 uppercase tracking-widest">
-                  Sunrise
-                </p>
-                <p className="text-sm font-semibold">{formatTime(sunrise)}</p>
-              </div>
-            </div>
-            <div className="h-6 w-px bg-white/20" />
-            <div className="flex items-center gap-2">
-              <Sunset className="w-4 h-4 text-orange-300" />
-              <div>
-                <p className="text-[10px] text-white/60 uppercase tracking-widest">
-                  Sunset
-                </p>
-                <p className="text-sm font-semibold">{formatTime(sunset)}</p>
-              </div>
-            </div>
-            <div className="h-6 w-px bg-white/20 hidden sm:block" />
-            <div className="hidden sm:flex items-center gap-2">
-              <Eye className="w-4 h-4 text-white/60" />
-              <div>
-                <p className="text-[10px] text-white/60 uppercase tracking-widest">
-                  Elevation
-                </p>
-                <p className="text-sm font-semibold">
-                  {Math.round(weatherData.elevation)}m
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Timezone */}
-        <p className="mt-3 text-center text-xs text-white/50">
-          Timezone: {weatherData.timezone} ({weatherData.timezone_abbreviation})
-        </p>
       </div>
+
+      {/* ── Stats grid ────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4 sm:p-6">
+        <StatTile
+          icon={<Droplets className="h-5 w-5 text-blue-500" />}
+          label="Humidity"
+          value={`${data.humidity}%`}
+          bg="bg-blue-50 dark:bg-blue-950/40"
+        />
+        <StatTile
+          icon={<Wind className="h-5 w-5 text-teal-500" />}
+          label="Wind"
+          value={`${data.windSpeed} km/h`}
+          bg="bg-teal-50 dark:bg-teal-950/40"
+        />
+        <StatTile
+          icon={<Thermometer className="h-5 w-5 text-orange-500" />}
+          label="Feels Like"
+          value={formatTemperature(data.feelsLike, unit)}
+          bg="bg-orange-50 dark:bg-orange-950/40"
+        />
+        <StatTile
+          icon={<Mountain className="h-5 w-5 text-violet-500" />}
+          label="Elevation"
+          value={`${data.elevation} m`}
+          bg="bg-violet-50 dark:bg-violet-950/40"
+        />
+      </div>
+
+      {todayForecast && (
+        <div className="flex gap-3 px-5 pb-5 sm:px-6 sm:pb-6">
+          <SunTile
+            icon={<Sunrise className="h-5 w-5 text-amber-500" />}
+            label="Sunrise"
+            time={todayForecast.sunrise}
+            bg="bg-amber-50 dark:bg-amber-950/30"
+            textColor="text-amber-700 dark:text-amber-400"
+          />
+          <SunTile
+            icon={<Sunset className="h-5 w-5 text-rose-500" />}
+            label="Sunset"
+            time={todayForecast.sunset}
+            bg="bg-rose-50 dark:bg-rose-950/30"
+            textColor="text-rose-700 dark:text-rose-400"
+          />
+        </div>
+      )}
+
+      {/* ── Footer — coordinates ─────────────────────────────────────────── */}
+      <div className="flex items-center justify-center gap-1.5 border-t border-slate-100 px-5 py-3 dark:border-slate-700/50">
+        <Navigation className="h-3 w-3 text-slate-400" />
+        <span className="text-xs tabular-nums text-slate-400 dark:text-slate-500">
+          {data.latitude.toFixed(4)}°N, {data.longitude.toFixed(4)}°E
+        </span>
+      </div>
+    </article>
+  );
+}
+
+// Sub-components
+
+interface StatTileProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  bg: string;
+}
+
+function StatTile({ icon, label, value, bg }: StatTileProps) {
+  return (
+    <div
+      className={`flex flex-col gap-2 rounded-2xl p-4 transition-transform duration-200 hover:scale-[1.02] ${bg}`}
+    >
+      {icon}
+      <span className="text-lg font-bold text-slate-800 dark:text-slate-100">
+        {value}
+      </span>
+      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
     </div>
   );
 }
 
-// ─── Stat Card sub-component ─────────────────────────────────────────────────
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-}: {
+interface SunTileProps {
   icon: React.ReactNode;
   label: string;
-  value: string;
-  sub?: string;
-}) {
+  time: string;
+  bg: string;
+  textColor: string;
+}
+
+function SunTile({ icon, label, time, bg, textColor }: SunTileProps) {
   return (
-    <div className="rounded-2xl bg-white/20 backdrop-blur-sm p-3 sm:p-4">
-      <div className="flex items-center gap-1.5 text-white/70 mb-1.5">
-        {icon}
-        <span className="text-[10px] uppercase tracking-wider font-medium">
+    <div
+      className={`flex flex-1 items-center gap-3 rounded-2xl px-4 py-3 ${bg}`}
+    >
+      {icon}
+      <div>
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
           {label}
-        </span>
+        </p>
+        <p className={`text-base font-bold tabular-nums ${textColor}`}>
+          {time}
+        </p>
       </div>
-      <p className="font-semibold text-base sm:text-lg leading-tight">{value}</p>
-      {sub && (
-        <p className="text-[11px] text-white/60 mt-0.5">{sub}</p>
-      )}
     </div>
   );
 }

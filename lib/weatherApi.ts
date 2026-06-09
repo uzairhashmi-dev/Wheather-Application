@@ -1,173 +1,292 @@
-// lib/weatherApi.ts
-// WHY: All weather data fetching logic lives here.
-// Components never touch raw API URLs — they use this clean abstraction.
+// Two responsibilities:
+//   1. Fetch raw weather data from Open-Meteo Forecast API
+//   2. Transform that raw payload into clean, UI-ready ProcessedWeatherData
+//
+// Components and the Zustand store import fetchWeatherData() and never touch
+// the raw API shapes directly.
 
-import { WeatherResponse } from "@/types/weather";
+import type {
+  GeocodingResult,
+  WeatherApiResponse,
+  ProcessedWeatherData,
+  HourlyForecast,
+  DailyForecast,
+  WeatherCodeInfo,
+} from '@/types/weather';
 
-const WEATHER_BASE_URL = "https://api.open-meteo.com/v1/forecast";
+const BASE_URL = 'https://api.open-meteo.com/v1/forecast';
 
+// Public API
+
+/**
+ * Fetches and fully processes weather data for a geocoded location.
+ *
+ * @param location  A GeocodingResult (from geocodingApi) with lat/lng
+ * @returns         ProcessedWeatherData ready to drop into UI components
+ * @throws          WeatherApiError on network / HTTP failure
+ */
 export async function fetchWeatherData(
-  latitude: number,
-  longitude: number
-): Promise<WeatherResponse> {
-  const params = new URLSearchParams({
-    latitude: latitude.toString(),
-    longitude: longitude.toString(),
+  location: GeocodingResult
+): Promise<ProcessedWeatherData> {
+  const url = buildWeatherUrl(location.latitude, location.longitude);
 
-    // Current weather fields
-    current: [
-      "temperature_2m",
-      "relative_humidity_2m",
-      "apparent_temperature",
-      "is_day",
-      "precipitation",
-      "weather_code",
-      "wind_speed_10m",
-    ].join(","),
-
-    // Hourly fields (next 24 hours)
-    hourly: [
-      "temperature_2m",
-      "relative_humidity_2m",
-      "apparent_temperature",
-      "precipitation_probability",
-      "weather_code",
-      "wind_speed_10m",
-    ].join(","),
-
-    // Daily fields (7-day forecast)
-    daily: [
-      "weather_code",
-      "temperature_2m_max",
-      "temperature_2m_min",
-      "sunrise",
-      "sunset",
-      "precipitation_sum",
-      "wind_speed_10m_max",
-    ].join(","),
-
-    timezone: "auto", // Use location's local timezone
-    forecast_days: "7",
-  });
-
-  const url = `${WEATHER_BASE_URL}?${params.toString()}`;
-
-  const response = await fetch(url, {
-    next: { revalidate: 1800 }, // Cache for 30 minutes
-  });
+  const response = await fetch(url, { cache: 'no-store' });
 
   if (!response.ok) {
-    throw new Error(
-      `Weather API failed: ${response.status} ${response.statusText}`
+    throw new WeatherApiError(
+      `Weather API responded with status ${response.status}`,
+      response.status
     );
   }
 
-  const data: WeatherResponse = await response.json();
-  return data;
+  const raw: WeatherApiResponse = await response.json();
+  return transformWeatherData(raw, location);
 }
 
-// ─── WMO Weather Interpretation Code helpers ────────────────────────────────
-// Source: https://open-meteo.com/en/docs#weathervariables
+// URL builder
+// 
 
-export function getWeatherDescription(code: number): string {
-  const descriptions: Record<number, string> = {
-    0: "Clear Sky",
-    1: "Mainly Clear",
-    2: "Partly Cloudy",
-    3: "Overcast",
-    45: "Foggy",
-    48: "Icy Fog",
-    51: "Light Drizzle",
-    53: "Drizzle",
-    55: "Heavy Drizzle",
-    61: "Light Rain",
-    63: "Rain",
-    65: "Heavy Rain",
-    71: "Light Snow",
-    73: "Snow",
-    75: "Heavy Snow",
-    77: "Snow Grains",
-    80: "Light Showers",
-    81: "Showers",
-    82: "Heavy Showers",
-    85: "Snow Showers",
-    86: "Heavy Snow Showers",
-    95: "Thunderstorm",
-    96: "Thunderstorm & Hail",
-    99: "Severe Thunderstorm",
+function buildWeatherUrl(latitude: number, longitude: number): string {
+  const params = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+    // Hourly variables
+    hourly: [
+      'temperature_2m',
+      'relative_humidity_2m',
+      'apparent_temperature',
+      'precipitation_probability',
+      'weather_code',
+      'wind_speed_10m',
+    ].join(','),
+    // Daily variables
+    daily: [
+      'weather_code',
+      'temperature_2m_max',
+      'temperature_2m_min',
+      'sunrise',
+      'sunset',
+      'precipitation_sum',
+      'wind_speed_10m_max',
+    ].join(','),
+    wind_speed_unit: 'kmh',
+    timezone: 'auto',            // let the API infer from coordinates
+    forecast_days: '7',
+  });
+
+  return `${BASE_URL}?${params.toString()}`;
+}
+
+// Transformation layer
+
+function transformWeatherData(
+  raw: WeatherApiResponse,
+  location: GeocodingResult
+): ProcessedWeatherData {
+  const now = new Date();
+
+  // ── Find the index of the current hour in the hourly arrays ───────────────
+  const currentHourIndex = findCurrentHourIndex(raw.hourly.time, now);
+
+  // ── Current conditions 
+  const currentCode = raw.hourly.weather_code[currentHourIndex] ?? 0;
+  const codeInfo = getWeatherCodeInfo(currentCode);
+  const isDay = checkIfDay(raw.daily.sunrise, raw.daily.sunset, now);
+
+  // ── Process next 24 hourly slots ─
+  const hourly: HourlyForecast[] = [];
+  const endIndex = Math.min(currentHourIndex + 24, raw.hourly.time.length);
+
+  for (let i = currentHourIndex; i < endIndex; i++) {
+    const code = raw.hourly.weather_code[i] ?? 0;
+    hourly.push({
+      time: formatHourlyTime(raw.hourly.time[i]),
+      temperature: Math.round(raw.hourly.temperature_2m[i] ?? 0),
+      feelsLike: Math.round(raw.hourly.apparent_temperature[i] ?? 0),
+      humidity: Math.round(raw.hourly.relative_humidity_2m[i] ?? 0),
+      windSpeed: Math.round(raw.hourly.wind_speed_10m[i] ?? 0),
+      precipitationProbability: Math.round(
+        raw.hourly.precipitation_probability[i] ?? 0
+      ),
+      weatherCode: code,
+      weatherLabel: getWeatherCodeInfo(code).label,
+    });
+  }
+
+  // ── Process 7-day daily slots
+  const daily: DailyForecast[] = raw.daily.time.map((dateStr, i) => {
+    const code = raw.daily.weather_code[i] ?? 0;
+    return {
+      date: formatDailyDate(dateStr),
+      dateShort: formatDayShort(dateStr),
+      tempMax: Math.round(raw.daily.temperature_2m_max[i] ?? 0),
+      tempMin: Math.round(raw.daily.temperature_2m_min[i] ?? 0),
+      weatherCode: code,
+      weatherLabel: getWeatherCodeInfo(code).label,
+      windSpeed: Math.round(raw.daily.wind_speed_10m_max[i] ?? 0),
+      precipitation: Math.round(raw.daily.precipitation_sum[i] ?? 0),
+      sunrise: formatTimeFromISO(raw.daily.sunrise[i] ?? ''),
+      sunset: formatTimeFromISO(raw.daily.sunset[i] ?? ''),
+    };
+  });
+
+  return {
+    city: location.name,
+    country: location.country,
+    countryCode: location.country_code,
+    timezone: raw.timezone,
+    latitude: raw.latitude,
+    longitude: raw.longitude,
+    elevation: raw.elevation,
+
+    currentTemp: Math.round(raw.hourly.temperature_2m[currentHourIndex] ?? 0),
+    feelsLike: Math.round(
+      raw.hourly.apparent_temperature[currentHourIndex] ?? 0
+    ),
+    humidity: Math.round(
+      raw.hourly.relative_humidity_2m[currentHourIndex] ?? 0
+    ),
+    windSpeed: Math.round(raw.hourly.wind_speed_10m[currentHourIndex] ?? 0),
+    weatherCode: currentCode,
+    weatherLabel: codeInfo.label,
+    weatherIcon: isDay ? (codeInfo.dayIcon ?? codeInfo.icon) : (codeInfo.nightIcon ?? codeInfo.icon),
+    isDay,
+
+    hourly,
+    daily,
   };
-  return descriptions[code] ?? "Unknown";
 }
 
-export function getWeatherIcon(code: number, isDay: number = 1): string {
-  // Returns lucide-react icon names
-  if (code === 0) return isDay ? "Sun" : "Moon";
-  if (code <= 2) return isDay ? "CloudSun" : "CloudMoon";
-  if (code === 3) return "Cloud";
-  if (code <= 48) return "CloudFog";
-  if (code <= 55) return "CloudDrizzle";
-  if (code <= 65) return "CloudRain";
-  if (code <= 77) return "Snowflake";
-  if (code <= 82) return "CloudRain";
-  if (code <= 86) return "CloudSnow";
-  return "CloudLightning";
+// Date / time helpers
+
+/**
+ * Finds the index in the hourly time array that matches the current hour.
+ * Falls back to 0 if nothing matches (shouldn't happen with `timezone: auto`).
+ */
+function findCurrentHourIndex(times: string[], now: Date): number {
+  // Build an ISO-like string for the current local hour: "YYYY-MM-DDTHH:00"
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const target = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+    now.getDate()
+  )}T${pad(now.getHours())}:00`;
+
+  const idx = times.findIndex((t) => t.startsWith(target));
+  return idx >= 0 ? idx : 0;
 }
 
-export function getWeatherGradient(code: number, isDay: number = 1): string {
-  if (code === 0 && isDay) return "from-amber-400 via-orange-300 to-yellow-200";
-  if (code === 0 && !isDay) return "from-slate-800 via-indigo-900 to-slate-900";
-  if (code <= 2 && isDay) return "from-sky-400 via-blue-300 to-cyan-200";
-  if (code <= 2 && !isDay) return "from-slate-700 via-blue-900 to-indigo-900";
-  if (code === 3) return "from-slate-400 via-gray-400 to-zinc-300";
-  if (code <= 48) return "from-slate-500 via-gray-400 to-slate-300";
-  if (code <= 65) return "from-slate-600 via-blue-500 to-cyan-400";
-  if (code <= 77) return "from-sky-200 via-blue-100 to-white";
-  if (code <= 82) return "from-slate-700 via-blue-600 to-slate-500";
-  return "from-slate-800 via-purple-900 to-indigo-900";
+/** Formats "2024-06-09T14:00" → "14:00" */
+function formatHourlyTime(isoString: string): string {
+  const parts = isoString.split('T');
+  return parts[1]?.slice(0, 5) ?? isoString;
 }
 
-export function formatTemperature(temp: number): string {
-  return `${Math.round(temp)}°C`;
-}
-
-export function formatTime(isoString: string): string {
-  return new Date(isoString).toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
+/** Formats "2024-06-09" → "Mon, Jun 9" */
+function formatDailyDate(dateStr: string): string {
+  const date = new Date(`${dateStr}T12:00:00`); // noon avoids TZ shift on Date()
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
   });
 }
 
-export function formatDay(dateString: string): string {
-  const date = new Date(dateString);
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-
-  if (date.toDateString() === today.toDateString()) return "Today";
-  if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+/** Formats "2024-06-09" → "Mon" */
+function formatDayShort(dateStr: string): string {
+  const date = new Date(`${dateStr}T12:00:00`);
+  return date.toLocaleDateString('en-US', { weekday: 'short' });
 }
 
-export function formatHour(isoString: string): string {
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffH = Math.round((date.getTime() - now.getTime()) / 3600000);
-  if (diffH === 0) return "Now";
-  return date.toLocaleTimeString("en-US", { hour: "numeric", hour12: true });
+/** Formats an ISO datetime string → "HH:MM" (local) */
+function formatTimeFromISO(isoString: string): string {
+  if (!isoString) return '--:--';
+  const parts = isoString.split('T');
+  return parts[1]?.slice(0, 5) ?? '--:--';
 }
 
-export function getWindDirection(degrees: number): string {
-  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-  return dirs[Math.round(degrees / 45) % 8];
+/** Returns true if the current time is between today's sunrise and sunset */
+function checkIfDay(
+  sunrises: string[],
+  sunsets: string[],
+  now: Date
+): boolean {
+  if (!sunrises[0] || !sunsets[0]) return true;
+
+  const todayStr = now.toISOString().slice(0, 10);
+  const todayIdx = sunrises.findIndex((s) => s.startsWith(todayStr));
+  const idx = todayIdx >= 0 ? todayIdx : 0;
+
+  const sunriseTime = new Date(sunrises[idx]).getTime();
+  const sunsetTime = new Date(sunsets[idx]).getTime();
+  const current = now.getTime();
+
+  return current >= sunriseTime && current <= sunsetTime;
 }
 
-// Get current hour index from hourly data
-export function getCurrentHourIndex(times: string[]): number {
-  const now = new Date();
-  return times.findIndex((t) => {
-    const d = new Date(t);
-    return d.getHours() === now.getHours() && d.toDateString() === now.toDateString();
-  });
+// WMO Weather Code → label + icon mapping
+// Reference: https://open-meteo.com/en/docs#weathervariables
+
+const WMO_CODE_MAP: Record<number, WeatherCodeInfo> = {
+  0:  { label: 'Clear Sky',            icon: '☀️',  dayIcon: '☀️',  nightIcon: '🌙' },
+  1:  { label: 'Mainly Clear',         icon: '🌤️', dayIcon: '🌤️', nightIcon: '🌙' },
+  2:  { label: 'Partly Cloudy',        icon: '⛅',  dayIcon: '⛅',  nightIcon: '🌑' },
+  3:  { label: 'Overcast',             icon: '☁️' },
+  45: { label: 'Foggy',                icon: '🌫️' },
+  48: { label: 'Icy Fog',              icon: '🌫️' },
+  51: { label: 'Light Drizzle',        icon: '🌦️' },
+  53: { label: 'Drizzle',              icon: '🌦️' },
+  55: { label: 'Heavy Drizzle',        icon: '🌧️' },
+  56: { label: 'Freezing Drizzle',     icon: '🌨️' },
+  57: { label: 'Heavy Freezing Drizzle', icon: '🌨️' },
+  61: { label: 'Light Rain',           icon: '🌧️' },
+  63: { label: 'Rain',                 icon: '🌧️' },
+  65: { label: 'Heavy Rain',           icon: '🌧️' },
+  66: { label: 'Freezing Rain',        icon: '🌨️' },
+  67: { label: 'Heavy Freezing Rain',  icon: '🌨️' },
+  71: { label: 'Light Snow',           icon: '🌨️' },
+  73: { label: 'Snow',                 icon: '❄️' },
+  75: { label: 'Heavy Snow',           icon: '❄️' },
+  77: { label: 'Snow Grains',          icon: '🌨️' },
+  80: { label: 'Light Showers',        icon: '🌦️' },
+  81: { label: 'Showers',              icon: '🌧️' },
+  82: { label: 'Heavy Showers',        icon: '⛈️' },
+  85: { label: 'Snow Showers',         icon: '🌨️' },
+  86: { label: 'Heavy Snow Showers',   icon: '❄️' },
+  95: { label: 'Thunderstorm',         icon: '⛈️' },
+  96: { label: 'Thunderstorm w/ Hail', icon: '⛈️' },
+  99: { label: 'Thunderstorm w/ Heavy Hail', icon: '⛈️' },
+};
+
+/** Returns label + icon for a WMO weather code. Falls back to "Unknown". */
+export function getWeatherCodeInfo(code: number): WeatherCodeInfo {
+  return WMO_CODE_MAP[code] ?? { label: 'Unknown', icon: '🌡️' };
+}
+
+// Unit conversion helpers (exported for use in components)
+
+/** Converts Celsius to Fahrenheit, rounded to nearest integer */
+export function celsiusToFahrenheit(celsius: number): number {
+  return Math.round((celsius * 9) / 5 + 32);
+}
+
+/** Returns a formatted temperature string with unit symbol */
+export function formatTemperature(
+  celsius: number,
+  unit: 'celsius' | 'fahrenheit'
+): string {
+  if (unit === 'fahrenheit') {
+    return `${celsiusToFahrenheit(celsius)}°F`;
+  }
+  return `${celsius}°C`;
+}
+
+// Custom error class
+
+export class WeatherApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode?: number
+  ) {
+    super(message);
+    this.name = 'WeatherApiError';
+  }
 }

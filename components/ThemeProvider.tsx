@@ -1,52 +1,23 @@
-"use client";
+// components/ThemeProvider.tsx
+// Wraps the entire app with next-themes so every component can read/toggle
+// dark or light mode without prop-drilling.
+// Used once in app/layout.tsx — never imported by individual pages.
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+'use client';
 
-type Theme = "light" | "dark";
+import { ThemeProvider as NextThemesProvider } from 'next-themes';
+import type { ThemeProviderProps } from 'next-themes';
 
-interface ThemeContextValue {
-  theme: Theme;
-  toggleTheme: () => void;
-  isDark: boolean;
-}
-
-const ThemeContext = createContext<ThemeContextValue>({
-  theme: "light",
-  toggleTheme: () => {},
-  isDark: false,
-});
-
-function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
-  const saved = localStorage.getItem("skypulse-theme") as Theme | null;
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  return saved ?? (prefersDark ? "dark" : "light");
-}
-
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-    localStorage.setItem("skypulse-theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
-  };
-
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, isDark: theme === "dark" }}>
+    <NextThemesProvider
+      attribute="class"        // adds class="dark" on <html> — Tailwind reads this
+      defaultTheme="system"    // respects OS preference on first visit
+      enableSystem             // auto-switches with OS setting
+      disableTransitionOnChange // prevents flash of wrong colours on switch
+      {...props}
+    >
       {children}
-    </ThemeContext.Provider>
+    </NextThemesProvider>
   );
-}
-
-export function useTheme(): ThemeContextValue {
-  return useContext(ThemeContext);
 }

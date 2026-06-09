@@ -1,240 +1,209 @@
-// components/ForecastCard.tsx
-// WHY: Renders both the 7-day daily forecast and the 24-hour hourly forecast.
-// Exported as two separate named components: DailyForecast and HourlyForecast.
+//   1. Hourly forecast  → horizontal scrollable row (next 24 hours)
+//   2. Daily forecast   → vertical list (next 7 days)
+// Reads unit from Zustand — no prop needed for °C/°F.
+// All data comes from ProcessedWeatherData already shaped by weatherApi.ts
 
-"use client";
+'use client';
 
-import {
-  Sun, Moon, Cloud, CloudSun, CloudMoon, CloudFog, CloudDrizzle,
-  CloudRain, Snowflake, CloudSnow, CloudLightning, Wind, Droplets,
-  TrendingUp, TrendingDown,
-} from "lucide-react";
-import {
-  getWeatherDescription,
-  getWeatherIcon,
-  formatDay,
-  formatHour,
-  getCurrentHourIndex,
-} from "@/lib/weatherApi";
-import { useWeatherStore } from "@/store/weatherStore";
+import { Wind, Droplets, ChevronRight } from 'lucide-react';
 
-// Icon resolver
-const IconMap: Record<string, React.FC<{ className?: string }>> = {
-  Sun, Moon, Cloud, CloudSun, CloudMoon, CloudFog, CloudDrizzle,
-  CloudRain, Snowflake, CloudSnow, CloudLightning,
-};
+import { formatTemperature } from '@/lib/weatherApi';
+import { useTemperatureUnit } from '@/store/weatherStore';
+import type { HourlyForecast, DailyForecast } from '@/types/weather';
+import { getWeatherCodeInfo } from '@/lib/weatherApi';
 
-function WIcon({
-  code,
-  isDay = 1,
-  className = "",
-}: {
-  code: number;
-  isDay?: number;
-  className?: string;
-}) {
-  const name = getWeatherIcon(code, isDay);
-  const Comp = IconMap[name] ?? Cloud;
-  return <Comp className={className} />;
+
+interface ForecastCardProps {
+  hourly: HourlyForecast[];
+  daily: DailyForecast[];
 }
 
-// ─── Daily Forecast ─────────────────────────────────────────────────────────
-export function DailyForecast() {
-  const { weatherData } = useWeatherStore();
-  if (!weatherData) return null;
-
-  const { daily } = weatherData;
+export default function ForecastCard({ hourly, daily }: ForecastCardProps) {
+  const { unit } = useTemperatureUnit();
 
   return (
-    <section aria-label="7-day forecast" className="w-full animate-slide-up">
-      <h2 className="font-display text-base font-600 text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-        <span className="text-blue-500">◆</span>
-        7-Day Forecast
-      </h2>
+    <div className="w-full space-y-5">
+      {/* ── Hourly Sectio */}
+      <section>
+        <SectionTitle title="Hourly Forecast" subtitle="Next 24 hours" />
 
-      {/* Scrollable row of cards */}
-      <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-        {daily.time.map((date: string, i: number) => {
-          const code = daily.weather_code[i];
-          const max = daily.temperature_2m_max[i];
-          const min = daily.temperature_2m_min[i];
-          const precip = daily.precipitation_sum[i];
-          const wind = daily.wind_speed_10m_max[i];
-          const isToday = i === 0;
+        {/* Horizontal scroll container */}
+        <div className="mt-3 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {hourly.map((slot, index) => (
+            <HourlySlot key={`${slot.time}-${index}`} slot={slot} unit={unit} isFirst={index === 0} />
+          ))}
+        </div>
+      </section>
 
-          return (
-            <div
-              key={date}
-              className={`
-                shrink-0 w-30 sm:w-32.5
-                rounded-2xl p-4 flex flex-col items-center gap-2
-                border transition-all duration-200 cursor-default
-                hover:shadow-lg hover:-translate-y-0.5
-                ${
-                  isToday
-                    ? "bg-blue-500 dark:bg-blue-600 border-blue-400 text-white shadow-blue-200 dark:shadow-blue-900/40 shadow-md"
-                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
-                }
-              `}
-            >
-              {/* Day label */}
-              <span
-                className={`text-xs font-semibold uppercase tracking-wide ${
-                  isToday ? "text-blue-100" : "text-slate-500 dark:text-slate-400"
-                }`}
-              >
-                {formatDay(date)}
-              </span>
+      {/* ── Daily Section */}
+      <section>
+        <SectionTitle title="7-Day Forecast" subtitle="Daily overview" />
 
-              {/* Weather icon */}
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  isToday ? "bg-white/20" : "bg-blue-50 dark:bg-slate-700"
-                }`}
-              >
-                <WIcon code={code} className={`w-6 h-6 ${isToday ? "text-white" : "text-blue-500"}`} />
-              </div>
-
-              {/* Condition */}
-              <span
-                className={`text-[10px] text-center leading-tight ${
-                  isToday ? "text-blue-100" : "text-slate-500 dark:text-slate-400"
-                }`}
-              >
-                {getWeatherDescription(code)}
-              </span>
-
-              {/* Max / Min */}
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="flex items-center gap-0.5 text-sm font-bold">
-                  <TrendingUp className="w-3 h-3 text-orange-400" />
-                  {Math.round(max)}°
-                </span>
-                <span
-                  className={`flex items-center gap-0.5 text-xs ${
-                    isToday ? "text-blue-200" : "text-slate-400"
-                  }`}
-                >
-                  <TrendingDown className="w-3 h-3 text-sky-400" />
-                  {Math.round(min)}°
-                </span>
-              </div>
-
-              {/* Precipitation */}
-              {precip > 0 && (
-                <div
-                  className={`flex items-center gap-1 text-[10px] ${
-                    isToday ? "text-blue-100" : "text-blue-400"
-                  }`}
-                >
-                  <Droplets className="w-3 h-3" />
-                  {precip.toFixed(1)}mm
-                </div>
-              )}
-
-              {/* Wind */}
-              <div
-                className={`flex items-center gap-1 text-[10px] ${
-                  isToday ? "text-blue-100" : "text-slate-400 dark:text-slate-500"
-                }`}
-              >
-                <Wind className="w-3 h-3" />
-                {Math.round(wind)} km/h
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
+        <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          {daily.map((day, index) => (
+            <DailyRow
+              key={`${day.date}-${index}`}
+              day={day}
+              unit={unit}
+              isLast={index === daily.length - 1}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
-// ─── Hourly Forecast ─────────────────────────────────────────────────────────
-export function HourlyForecast() {
-  const { weatherData } = useWeatherStore();
-  if (!weatherData) return null;
+// Hourly slot card
 
-  const { hourly } = weatherData;
+interface HourlySlotProps {
+  slot: HourlyForecast;
+  unit: 'celsius' | 'fahrenheit';
+  isFirst: boolean;
+}
 
-  // Show 24 hours starting from current hour
-  const startIndex = Math.max(getCurrentHourIndex(hourly.time), 0);
-  const hours = hourly.time.slice(startIndex, startIndex + 24);
+function HourlySlot({ slot, unit, isFirst }: HourlySlotProps) {
+  const info = getWeatherCodeInfo(slot.weatherCode);
 
   return (
-    <section aria-label="Hourly forecast" className="w-full animate-slide-up">
-      <h2 className="font-display text-base font-600 text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-        <span className="text-purple-500">◆</span>
-        24-Hour Forecast
-      </h2>
+    <div
+      className={`flex shrink-0 flex-col items-center gap-2.5 rounded-2xl border px-4 py-4 transition-all duration-200 hover:scale-105 hover:shadow-md ${
+        isFirst
+          ? 'border-blue-300 bg-blue-50 shadow-blue-100 dark:border-blue-600 dark:bg-blue-950/60 dark:shadow-blue-900/30'
+          : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
+      }`}
+    >
+      {/* Time */}
+      <span
+        className={`text-xs font-semibold tabular-nums ${
+          isFirst
+            ? 'text-blue-600 dark:text-blue-400'
+            : 'text-slate-500 dark:text-slate-400'
+        }`}
+      >
+        {isFirst ? 'Now' : slot.time}
+      </span>
 
-      <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2">
-        {hours.map((time: string, idx: number) => {
-          const realIndex = startIndex + idx;
-          const code = hourly.weather_code[realIndex];
-          const temp = hourly.temperature_2m[realIndex];
-          const humidity = hourly.relative_humidity_2m[realIndex];
-          const precipProb = hourly.precipitation_probability[realIndex];
-          const isNow = idx === 0;
-          const isNight = new Date(time).getHours() >= 20 || new Date(time).getHours() < 6;
+      {/* Weather emoji */}
+      <span className="text-2xl leading-none" role="img" aria-label={slot.weatherLabel}>
+        {info.icon}
+      </span>
 
-          return (
-            <div
-              key={time}
-              className={`
-                shrink-0 w-20
-                rounded-2xl p-3 flex flex-col items-center gap-1.5
-                border transition-all duration-200 cursor-default
-                hover:shadow-md hover:-translate-y-0.5
-                ${
-                  isNow
-                    ? "bg-purple-500 dark:bg-purple-600 border-purple-400 text-white"
-                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
-                }
-              `}
-            >
-              {/* Hour */}
-              <span
-                className={`text-[11px] font-semibold ${
-                  isNow ? "text-purple-100" : "text-slate-500 dark:text-slate-400"
-                }`}
-              >
-                {isNow ? "Now" : formatHour(time)}
-              </span>
+      {/* Temperature */}
+      <span
+        className={`text-sm font-bold tabular-nums ${
+          isFirst
+            ? 'text-blue-700 dark:text-blue-300'
+            : 'text-slate-800 dark:text-slate-100'
+        }`}
+      >
+        {formatTemperature(slot.temperature, unit)}
+      </span>
 
-              {/* Icon */}
-              <WIcon
-                code={code}
-                isDay={isNight ? 0 : 1}
-                className={`w-6 h-6 ${isNow ? "text-white" : "text-blue-500"}`}
-              />
+      {/* Rain probability */}
+      {slot.precipitationProbability > 0 && (
+        <div className="flex items-center gap-0.5">
+          <Droplets className="h-3 w-3 text-blue-400" />
+          <span className="text-[10px] font-medium text-blue-500 dark:text-blue-400">
+            {slot.precipitationProbability}%
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
-              {/* Temp */}
-              <span className="font-bold text-sm">{Math.round(temp)}°</span>
+// Daily row
 
-              {/* Rain probability */}
-              {precipProb !== undefined && precipProb > 0 && (
-                <div
-                  className={`flex items-center gap-0.5 text-[10px] ${
-                    isNow ? "text-purple-100" : "text-blue-400"
-                  }`}
-                >
-                  <Droplets className="w-2.5 h-2.5" />
-                  {precipProb}%
-                </div>
-              )}
+interface DailyRowProps {
+  day: DailyForecast;
+  unit: 'celsius' | 'fahrenheit';
+  isLast: boolean;
+}
 
-              {/* Humidity */}
-              <div
-                className={`flex items-center gap-0.5 text-[10px] ${
-                  isNow ? "text-purple-100" : "text-slate-400 dark:text-slate-500"
-                }`}
-              >
-                💧{humidity}%
-              </div>
-            </div>
-          );
-        })}
+function DailyRow({ day, unit, isLast }: DailyRowProps) {
+  const info = getWeatherCodeInfo(day.weatherCode);
+
+  return (
+    <div
+      className={`flex items-center gap-3 px-5 py-4 transition-colors duration-150 hover:bg-slate-50 dark:hover:bg-slate-700/40 sm:gap-4 ${
+        !isLast
+          ? 'border-b border-slate-100 dark:border-slate-700/60'
+          : ''
+      }`}
+    >
+      {/* Day name */}
+      <span className="w-12 shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        {day.dateShort}
+      </span>
+
+      {/* Weather icon */}
+      <span
+        className="shrink-0 text-xl leading-none"
+        role="img"
+        aria-label={day.weatherLabel}
+      >
+        {info.icon}
+      </span>
+
+      {/* Condition label — hidden on very small screens */}
+      <span className="hidden min-w-0 flex-1 truncate text-sm text-slate-500 dark:text-slate-400 sm:block">
+        {day.weatherLabel}
+      </span>
+
+      {/* Spacer on mobile */}
+      <span className="flex-1 sm:hidden" />
+
+      {/* Wind */}
+      <div className="hidden items-center gap-1 sm:flex">
+        <Wind className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
+          {day.windSpeed} km/h
+        </span>
       </div>
-    </section>
+
+      {/* Precipitation */}
+      {day.precipitation > 0 && (
+        <div className="flex items-center gap-1">
+          <Droplets className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+          <span className="text-xs tabular-nums text-blue-500 dark:text-blue-400">
+            {day.precipitation}mm
+          </span>
+        </div>
+      )}
+
+      {/* Temp range */}
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="text-sm font-bold tabular-nums text-slate-800 dark:text-slate-100">
+          {formatTemperature(day.tempMax, unit)}
+        </span>
+        <span className="text-sm tabular-nums text-slate-400 dark:text-slate-500">
+          {formatTemperature(day.tempMin, unit)}
+        </span>
+      </div>
+
+      {/* Chevron decoration */}
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
+    </div>
+  );
+}
+
+// Section title
+
+interface SectionTitleProps {
+  title: string;
+  subtitle: string;
+}
+
+function SectionTitle({ title, subtitle }: SectionTitleProps) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
+        {title}
+      </h2>
+      <span className="text-xs text-slate-400 dark:text-slate-500">
+        {subtitle}
+      </span>
+    </div>
   );
 }
