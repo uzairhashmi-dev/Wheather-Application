@@ -1,17 +1,7 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   app/globals.css
-   Tailwind v4 entry point + custom utilities.
-   All design tokens (colors, fonts, animations) are declared here so
-   Tailwind's JIT compiler picks them up across the entire app.
-───────────────────────────────────────────────────────────────────────────── */
-
 @import "tailwindcss";
 
-/* ── Dark mode strategy ────────────────────────────────────────────────────── */
-/* next-themes adds class="dark" on <html> — Tailwind reads it via this variant */
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark,.dark *));
 
-/* ── Base resets ───────────────────────────────────────────────────────────── */
 @layer base {
   *,
   *::before,
@@ -33,29 +23,25 @@
     min-height: 100dvh;
   }
 
-  /* Better focus ring for keyboard users */
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-blue-500;
   }
 
-  /* Smooth scrollbars on supported browsers */
   :root {
     scrollbar-width: thin;
-    scrollbar-color: theme(colors.slate.300) transparent;
+    scrollbar-color: #cbd5e1 transparent;
   }
 
   .dark {
-    scrollbar-color: theme(colors.slate.600) transparent;
+    scrollbar-color: #475569 transparent;
   }
 
-  /* Images fill their containers by default */
   img,
   video {
     max-width: 100%;
     display: block;
   }
 
-  /* Make interactive elements cursor-pointer */
   button,
   [role="button"],
   label[for] {
@@ -63,10 +49,7 @@
   }
 }
 
-/* ── Custom utilities ──────────────────────────────────────────────────────── */
 @layer utilities {
-
-  /* Hide scrollbar but keep scroll functionality — used in hourly strip */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -76,12 +59,10 @@
     display: none;
   }
 
-  /* Tabular numbers for all weather values — prevents layout jitter */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 
-  /* Smooth fade-in for weather cards appearing after load */
   .animate-fade-in {
     animation: fadeIn 0.4s ease-out both;
   }
@@ -94,17 +75,16 @@
     animation: fadeUp 0.5s ease-out 0.15s both;
   }
 
-  /* Gentle float for the hero icon on home page */
   .animate-float {
     animation: float 4s ease-in-out infinite;
   }
 }
 
-/* ── Keyframe definitions ──────────────────────────────────────────────────── */
 @keyframes fadeIn {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -115,6 +95,7 @@
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -122,9 +103,11 @@
 }
 
 @keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
+  0%,
+  100% {
+    transform: translateY(0);
   }
+
   50% {
     transform: translateY(-10px);
   }
