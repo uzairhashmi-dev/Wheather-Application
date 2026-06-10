@@ -107,7 +107,7 @@ export default function WeatherPage() {
       </div>
 
       {/* Hourly + daily forecast */}
-      <div className="animate-fade-up-delay">
+      <div className="animate-fade-up-delay px-4 sm:px-0">
         <ForecastCard hourly={weather.hourly} daily={weather.daily} />
       </div>
 

@@ -28,7 +28,7 @@ export default function ForecastCard({ hourly, daily }: ForecastCardProps) {
         <SectionTitle title="Hourly Forecast" subtitle="Next 24 hours" />
 
         {/* Horizontal scroll container */}
-        <div className="mt-3 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="mt-3 flex gap-3 overflow-x-auto pb-3 scrollbar-hide snap-x snap-mandatory sm:gap-3" style={{ WebkitOverflowScrolling: 'touch' }}>
           {hourly.map((slot, index) => (
             <HourlySlot key={`${slot.time}-${index}`} slot={slot} unit={unit} isFirst={index === 0} />
           ))}
@@ -67,7 +67,7 @@ function HourlySlot({ slot, unit, isFirst }: HourlySlotProps) {
 
   return (
     <div
-      className={`flex shrink-0 flex-col items-center gap-2.5 rounded-2xl border px-4 py-4 transition-all duration-200 hover:scale-105 hover:shadow-md ${
+      className={`flex shrink-0 snap-start flex-col items-center gap-2 rounded-2xl border px-3 py-3 sm:px-4 sm:py-4 transition-all duration-200 hover:scale-105 hover:shadow-md ${
         isFirst
           ? 'border-blue-300 bg-blue-50 shadow-blue-100 dark:border-blue-600 dark:bg-blue-950/60 dark:shadow-blue-900/30'
           : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
