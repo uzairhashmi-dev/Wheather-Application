@@ -1,5 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// components/SearchBar.tsx
 // The main search experience. Handles:
 //   • Controlled input with debounced API calls (300 ms)
 //   • Dropdown suggestion list with flag + region info
@@ -7,7 +5,6 @@
 //   • Click-outside to close dropdown
 //   • Loading spinner inside input
 //   • Empty state + error state in dropdown
-// ─────────────────────────────────────────────────────────────────────────────
 
 'use client';
 
@@ -25,11 +22,9 @@ import { useSearch } from '@/store/weatherStore';
 import { formatCityLabel, flagEmoji } from '@/lib/geocodingApi';
 import type { GeocodingResult } from '@/types/weather';
 
-// ─────────────────────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 300;
 
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function SearchBar() {
   const router = useRouter();
@@ -68,7 +63,7 @@ export default function SearchBar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [clearSuggestions]);
 
-  // ── Debounced fetch ───────────────────────────────────────────────────────
+  // ── Debounced fetch 
   const handleInputChange = useCallback(
     (value: string) => {
       setSearchQuery(value);
@@ -88,7 +83,7 @@ export default function SearchBar() {
     [setSearchQuery, fetchSuggestions, clearSuggestions]
   );
 
-  // ── Select a suggestion ───────────────────────────────────────────────────
+  // ── Select a suggestion 
   const handleSelect = useCallback(
     async (location: GeocodingResult) => {
       clearSuggestions();
@@ -100,14 +95,14 @@ export default function SearchBar() {
     [fetchWeather, clearSuggestions, router]
   );
 
-  // ── Clear input ───────────────────────────────────────────────────────────
+  // ── Clear input
   function handleClear() {
     setSearchQuery('');
     clearSuggestions();
     inputRef.current?.focus();
   }
 
-  // ── Keyboard navigation ───────────────────────────────────────────────────
+  // ── Keyboard navigation
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (!isOpen || suggestions.length === 0) return;
 
@@ -143,9 +138,9 @@ export default function SearchBar() {
   const isLoading = suggestionsStatus === 'loading';
 
   return (
-    <div ref={containerRef} className="relative z-50 w-full max-w-2xl">
+    <div ref={containerRef} className="relative z-[9999] w-full max-w-2xl">
 
-      {/* ── Input wrapper ─────────────────────────────────────────────────── */}
+      {/* ── Input wrapper  */}
       <div className="relative flex items-center">
         {/* Left icon */}
         <div className="pointer-events-none absolute left-4 flex items-center">
@@ -189,7 +184,7 @@ export default function SearchBar() {
         <ul
           id="search-suggestions"
           role="listbox"
-        className="absolute left-0 right-0 top-[calc(100%+8px)] z-[9999] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40 dark:border-slate-700 dark:bg-slate-800 dark:shadow-slate-900/60"        >
+        className="absolute left-0 right-0 top-[calc(100%+8px)] z-[9999] overflow-y-auto max-h-[400px] rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40 dark:border-slate-700 dark:bg-slate-800 dark:shadow-slate-900/60"        >
           {suggestions.length > 0 ? (
             suggestions.map((result, index) => (
               <SuggestionItem

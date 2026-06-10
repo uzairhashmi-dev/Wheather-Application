@@ -3,7 +3,6 @@
 // Reads unit (°C/°F) from Zustand — no props needed for that.
 
 'use client';
-
 import {
   Wind,
   Droplets,
@@ -19,7 +18,6 @@ import { formatTemperature } from '@/lib/weatherApi';
 import { flagEmoji } from '@/lib/geocodingApi';
 import { useTemperatureUnit } from '@/store/weatherStore';
 import type { ProcessedWeatherData } from '@/types/weather';
-
 
 interface WeatherCardProps {
   data: ProcessedWeatherData;
@@ -48,7 +46,7 @@ export default function WeatherCard({ data }: WeatherCardProps) {
           }`}
         />
 
-        {/* ── City row ────────────────────────────────────────────────────── */}
+        {/* ── City row ─ */}
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -72,7 +70,7 @@ export default function WeatherCard({ data }: WeatherCardProps) {
           </span>
         </div>
 
-        {/* ── Temperature + condition ──────────────────────────────────────── */}
+        {/* ── Temperature + condition  */}
         <div className="flex items-end justify-between gap-4">
           <div>
             <div className="flex items-start gap-2">

@@ -1,4 +1,3 @@
-// Handles all communication with the Open-Meteo Geocoding API.
 // Converts a city name string into a list of matching GeocodingResult objects.
 // Components call fetchCitySuggestions() — no raw fetch() anywhere else.
 
@@ -10,14 +9,6 @@ const BASE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const SUGGESTION_COUNT = 6;
 
 // Core fetcher
-
-/**
- * Searches for cities matching the given query string.
- *
- * @param query   The city name typed by the user (e.g. "Berlin")
- * @returns       An array of GeocodingResult objects, or [] on empty / error
- * @throws        Re-throws on network failure so the store can handle it
- */
 export async function fetchCitySuggestions(
   query: string
 ): Promise<GeocodingResult[]> {
@@ -46,7 +37,6 @@ export async function fetchCitySuggestions(
   return data.results ?? [];
 }
 
-// Helpers
 
 /** Builds the full geocoding request URL with query params */
 function buildGeocodingUrl(cityName: string): string {
@@ -78,7 +68,6 @@ export function formatCityLabel(result: GeocodingResult): string {
 
 /**
  * Works in all modern browsers / Node 18+.
- *
  * @example flagEmoji("DE") // "🇩🇪"
  */
 export function flagEmoji(countryCode: string): string {

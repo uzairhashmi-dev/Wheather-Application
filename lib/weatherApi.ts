@@ -1,9 +1,4 @@
-// Two responsibilities:
-//   1. Fetch raw weather data from Open-Meteo Forecast API
-//   2. Transform that raw payload into clean, UI-ready ProcessedWeatherData
-//
 // Components and the Zustand store import fetchWeatherData() and never touch
-// the raw API shapes directly.
 
 import type {
   GeocodingResult,
@@ -16,15 +11,7 @@ import type {
 
 const BASE_URL = 'https://api.open-meteo.com/v1/forecast';
 
-// Public API
 
-/**
- * Fetches and fully processes weather data for a geocoded location.
- *
- * @param location  A GeocodingResult (from geocodingApi) with lat/lng
- * @returns         ProcessedWeatherData ready to drop into UI components
- * @throws          WeatherApiError on network / HTTP failure
- */
 export async function fetchWeatherData(
   location: GeocodingResult
 ): Promise<ProcessedWeatherData> {
@@ -44,8 +31,6 @@ export async function fetchWeatherData(
 }
 
 // URL builder
-// 
-
 function buildWeatherUrl(latitude: number, longitude: number): string {
   const params = new URLSearchParams({
     latitude: String(latitude),
@@ -85,7 +70,7 @@ function transformWeatherData(
 ): ProcessedWeatherData {
   const now = new Date();
 
-  // ── Find the index of the current hour in the hourly arrays ───────────────
+  // ── Find the index of the current hour in the hourly arrays 
   const currentHourIndex = findCurrentHourIndex(raw.hourly.time, now);
 
   // ── Current conditions 

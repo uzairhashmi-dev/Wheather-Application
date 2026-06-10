@@ -1,25 +1,21 @@
 
-
-/** One city result returned by the Open-Meteo Geocoding API */
+// / API se jo raw data aata hai uski shape
 export interface GeocodingResult {
   id: number;
-  name: string;                 // city name  e.g. "Berlin"
-  latitude: number;
-  longitude: number;
+  name: string;                 // city name  e.g. "karachi"
+  latitude: number;             //26.4444
+  longitude: number;            //78.7632
   country: string;              // e.g. "Germany"
-  country_code: string;         // e.g. "DE"
+  country_code: string;         // e.g. "pk"
   admin1?: string;              // state / province  e.g. "Berlin"
   timezone: string;             // IANA timezone  e.g. "Europe/Berlin"
   population?: number;
 }
-
-/** Raw API envelope from geocoding endpoint */
+// /** Raw API envelope from geocoding endpoint */
 export interface GeocodingApiResponse {
   results?: GeocodingResult[];
   generationtime_ms: number;
 }
-
-// ── Weather (raw API) 
 /** Hourly data arrays exactly as the API returns them */
 export interface HourlyWeatherRaw {
   time: string[];                        // ISO-8601 strings
@@ -30,7 +26,6 @@ export interface HourlyWeatherRaw {
   precipitation_probability: number[];
   apparent_temperature: number[];
 }
-
 /** Daily data arrays exactly as the API returns them */
 export interface DailyWeatherRaw {
   time: string[];                        // "YYYY-MM-DD" strings
@@ -42,7 +37,6 @@ export interface DailyWeatherRaw {
   sunrise: string[];
   sunset: string[];
 }
-
 /** Full envelope returned by Open-Meteo Forecast API */
 export interface WeatherApiResponse {
   latitude: number;
@@ -57,8 +51,6 @@ export interface WeatherApiResponse {
   hourly: HourlyWeatherRaw;
   daily: DailyWeatherRaw;
 }
-
-
 /** A single processed hourly snapshot shown in the UI */
 export interface HourlyForecast {
   time: string;                  // formatted, e.g. "14:00"
@@ -70,7 +62,6 @@ export interface HourlyForecast {
   precipitationProbability: number;
   feelsLike: number;
 }
-
 /** A single processed daily forecast card */
 export interface DailyForecast {
   date: string;                  // formatted, e.g. "Mon, Jun 9"
@@ -84,7 +75,6 @@ export interface DailyForecast {
   sunrise: string;               // formatted time
   sunset: string;
 }
-
 /** The fully processed weather object stored in Zustand and consumed by UI */
 export interface ProcessedWeatherData {
   city: string;
@@ -94,7 +84,6 @@ export interface ProcessedWeatherData {
   latitude: number;
   longitude: number;
   elevation: number;
-
   // Current conditions (derived from first matching hourly slot)
   currentTemp: number;
   feelsLike: number;
@@ -104,14 +93,11 @@ export interface ProcessedWeatherData {
   weatherLabel: string;
   weatherIcon: string;           // emoji icon mapped from WMO code
   isDay: boolean;
-
   // Forecasts
   hourly: HourlyForecast[];      // next 24 hours
   daily: DailyForecast[];        // next 7 days
 }
-
-// ── Zustand store shape ───────────────────────────────────────────────────────
-
+// ── Zustand store shape
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export interface WeatherStore {
@@ -132,10 +118,7 @@ export interface WeatherStore {
   clearSuggestions: () => void;
   clearError: () => void;
 }
-
-
 export type TemperatureUnit = 'celsius' | 'fahrenheit';
-
 /** WMO Weather interpretation code metadata */
 export interface WeatherCodeInfo {
   label: string;

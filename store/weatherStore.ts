@@ -26,19 +26,10 @@ export const useWeatherStore = create<WeatherStore>()(
       suggestionsStatus: 'idle',
       unit: 'celsius',
 
-
-      /**
-       * Updates the controlled search input value.
-       * Called on every keystroke in SearchBar.
-       */
       setSearchQuery: (query: string) => {
         set({ searchQuery: query }, false, 'setSearchQuery');
       },
 
-      /**
-       * Fetches city suggestions from the Geocoding API.
-       * Debouncing is handled in the SearchBar component.
-       */
       fetchSuggestions: async (query: string) => {
         if (query.trim().length < 2) {
           set(
@@ -47,8 +38,7 @@ export const useWeatherStore = create<WeatherStore>()(
             'fetchSuggestions/tooShort'
           );
           return;
-        }
-
+        } 
         set({ suggestionsStatus: 'loading' }, false, 'fetchSuggestions/start');
 
         try {

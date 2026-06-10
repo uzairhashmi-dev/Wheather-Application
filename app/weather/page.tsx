@@ -1,12 +1,9 @@
 'use client';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// app/weather/page.tsx
 // Weather results page — shown after user selects a city.
 // Reads state from Zustand store (no props, no URL params needed).
 // Handles all 4 states: idle → redirect home, loading → skeleton,
 // error → error card, success → full weather display.
-// ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -18,7 +15,6 @@ import ForecastCard from '@/components/ForecastCard';
 import { FullPageSkeleton } from '@/components/Loader';
 import SearchBar from '@/components/SearchBar';
 
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function WeatherPage() {
   const router = useRouter();
@@ -31,12 +27,12 @@ export default function WeatherPage() {
     }
   }, [status, router]);
 
-  // ── Loading state ─────────────────────────────────────────────────────────
+  // ── Loading state 
   if (status === 'loading') {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
         {/* Search bar stays visible during loading */}
-        <div className="mb-6 flex justify-center">
+        <div className="mb-6 relative z-[9999] flex justify-center">
           <SearchBar />
         </div>
         <FullPageSkeleton />
@@ -44,7 +40,7 @@ export default function WeatherPage() {
     );
   }
 
-  // ── Error state ───────────────────────────────────────────────────────────
+  // ── Error state 
   if (status === 'error') {
     return (
       <div className="flex min-h-[calc(100dvh-4rem)] flex-col items-center justify-center px-4 py-12">
@@ -91,17 +87,17 @@ export default function WeatherPage() {
     );
   }
 
-  // ── Idle (before redirect fires) — render nothing ─────────────────────────
+  // ── Idle (before redirect fires) — render nothing
   if (status === 'idle' || !weather) {
     return null;
   }
 
-  // ── Success state ─────────────────────────────────────────────────────────
+  // ── Success state 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:py-8">
 
       {/* Search bar — always accessible at top of results */}
-      <div className="mb-6 flex justify-center animate-fade-in">
+      <div className="mb-6 relative z-[9999] flex justify-center animate-fade-in">
         <SearchBar />
       </div>
 

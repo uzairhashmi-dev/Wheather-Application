@@ -6,7 +6,6 @@
 import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
 import { Sun, Moon, Thermometer, CloudSun } from 'lucide-react';
-
 import { useTemperatureUnit } from '@/store/weatherStore';
 
 

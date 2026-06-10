@@ -42,7 +42,7 @@ export default function HomePage() {
           Search any city worldwide for real-time conditions and forecasts.
         </p>
 
-        <div className="flex justify-center animate-fade-up-delay">
+        <div className="relative z-[9999] flex justify-center animate-fade-up-delay">
           <SearchBar />
         </div>
 
