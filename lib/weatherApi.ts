@@ -9,7 +9,7 @@ import type {
   WeatherCodeInfo,
 } from '@/types/weather';
 
-const BASE_URL = 'https://api.open-meteo.com/v1/forecast';
+const BASE_URL = '/api/weather';
 
 
 export async function fetchWeatherData(
@@ -18,6 +18,7 @@ export async function fetchWeatherData(
   const url = buildWeatherUrl(location.latitude, location.longitude);
 
   const response = await fetch(url, { cache: 'no-store' });
+
 
   if (!response.ok) {
     throw new WeatherApiError(

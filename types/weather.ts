@@ -109,6 +109,8 @@ export interface WeatherStore {
   suggestions: GeocodingResult[];
   suggestionsStatus: FetchStatus;
   unit: TemperatureUnit;
+   locationStatus: LocationStatus;
+  locationWeather: LocationWeatherData | null;
 
   // Actions
   setSearchQuery: (query: string) => void;
@@ -117,6 +119,8 @@ export interface WeatherStore {
   setUnit: (unit: TemperatureUnit) => void;
   clearSuggestions: () => void;
   clearError: () => void;
+ fetchByLocation: () => Promise<void>;
+
 }
 export type TemperatureUnit = 'celsius' | 'fahrenheit';
 /** WMO Weather interpretation code metadata */
@@ -125,4 +129,15 @@ export interface WeatherCodeInfo {
   icon: string;                  // emoji
   dayIcon?: string;
   nightIcon?: string;
+}
+
+// NEW: Navbar mein show hone wala minimal weather data
+export type LocationStatus = 'idle' | 'loading' | 'success' | 'error';
+
+export interface LocationWeatherData {
+  city: string;
+  country: string;
+  currentTemp: number;
+  weatherIcon: string;
+  weatherLabel: string;
 }

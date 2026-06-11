@@ -162,7 +162,8 @@ export default function WeatherCard({ data }: WeatherCardProps) {
       <div className="flex items-center justify-center gap-1.5 border-t border-slate-100 px-5 py-3 dark:border-slate-700/50">
         <Navigation className="h-3 w-3 text-slate-400" />
         <span className="text-xs tabular-nums text-slate-400 dark:text-slate-500">
-          {data.latitude.toFixed(4)}°N, {data.longitude.toFixed(4)}°E
+          {/* {data.latitude.toFixed(4)}°N, {data.longitude.toFixed(4)}°E */}
+          {data.city}, {data.country}
         </span>
       </div>
     </article>

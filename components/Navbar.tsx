@@ -7,7 +7,7 @@ import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
 import { Sun, Moon, Thermometer, CloudSun } from 'lucide-react';
 import { useTemperatureUnit } from '@/store/weatherStore';
-
+import  LocationWeather from '@/components/LocationWeather';
 
 export default function Navbar() {
   const { theme, setTheme } = useTheme();
@@ -49,6 +49,8 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+
+          <LocationWeather />
 
           {/* Temperature unit toggle */}
           <button

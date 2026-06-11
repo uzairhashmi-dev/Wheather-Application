@@ -3,7 +3,7 @@
 
 import type { GeocodingApiResponse, GeocodingResult } from '@/types/weather';
 
-const BASE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
+const BASE_URL = '/api/geocoding';
 
 /** How many city suggestions to request from the API */
 const SUGGESTION_COUNT = 6;
@@ -21,7 +21,7 @@ export async function fetchCitySuggestions(
 
   const response = await fetch(url, {
     // next.js fetch extension — don't cache search results
-    cache: 'no-store',
+    cache: 'no-cache',
   });
 
   if (!response.ok) {
