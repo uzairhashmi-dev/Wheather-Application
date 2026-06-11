@@ -1,10 +1,4 @@
-// The main search experience. Handles:
-//   • Controlled input with debounced API calls (300 ms)
-//   • Dropdown suggestion list with flag + region info
-//   • Keyboard navigation (↑ ↓ Enter Escape)
-//   • Click-outside to close dropdown
-//   • Loading spinner inside input
-//   • Empty state + error state in dropdown
+
 
 'use client';
 
@@ -237,7 +231,7 @@ function SuggestionItem({
     >
       {/* Country flag */}
       <span className="text-xl leading-none" aria-hidden="true">
-        {flagEmoji(result.country_code)}
+        {flagEmoji(result.country_code) || result.country_code}
       </span>
 
       {/* City info */}

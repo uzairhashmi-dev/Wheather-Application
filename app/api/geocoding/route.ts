@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   // ── Reverse geocoding — lat/lon se city name dhundo
   if (lat && lon) {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+     `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`,
       {
         cache: 'no-cache',
         headers: { 'User-Agent': 'SkyCast Weather App' },
